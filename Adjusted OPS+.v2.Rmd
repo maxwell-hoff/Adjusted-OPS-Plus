@@ -5,7 +5,20 @@ date: "12/07/2020"
 ---
 
 ```{r}
-##combine all files into one data frame
+#load packages
+
+library(readr)
+library(stringr)
+library(tidyr)
+library(data.table)
+library(dplyr)
+library(tibble)
+library(lubridate)
+library(ggplot2)
+```
+
+```{r}
+##combine all files into one dataframe
 
 multi_union_all_1 <- function(mypath){
          filenames=list.files(path=mypath, full.names=TRUE)
@@ -14,5 +27,28 @@ multi_union_all_1 <- function(mypath){
 
 combined_files_all_years <- multi_union_all_1("/Users/maxhoff/Documents/Sabremetrics/Adjusted OPS+/retrosheet_data/play_by_play_logs")
 ```
-asdfa
 
+```{r}
+##add in row number and game number
+
+combined_files_all_years <- combined_files_all_years %>%
+  add_column(row_num_orig_file = 1:nrow(combined_files_all_years), .before = "category") %>%
+  mutate(game_number = ifelse(combined_files_all_years$category == "id",1,0)) %>%
+  mutate(game_number = cumsum(game_number))
+```
+
+```{r}
+##create separate dataframe for play log
+
+plays_all_years <- combined_files_all_years %>%
+  filter(category == "play")
+
+plays_all_years %>%
+  rename_all(recode, 
+             value_1 = "inning",
+             value_2 = "home/away",
+             value_3 = "batter_id",
+             value_4 = "ending_count",
+             value_5 = "all_pitches",
+             value_6 = "ab_result")
+```
