@@ -1,0 +1,18 @@
+---
+title: "Adjusted OPS+"
+author: "Max Hoff"
+date: "12/07/2020"
+---
+
+```{r}
+##combine all files into one data frame
+
+multi_union_all_1 <- function(mypath){
+         filenames=list.files(path=mypath, full.names=TRUE)
+         datalist = lapply(filenames, function(x){read_csv(file=x, col_names = c("category", "value_1", "value_2", "value_3", "value_4", "value_5", "value_6"))})
+         Reduce(function(x,y) {union_all(x,y)}, datalist)}
+
+combined_files_all_years <- multi_union_all_1(“/Users/maxhoff/Documents/Sabremetrics/Adjusted OPS+/retrosheet_data/play_by_play_logs”)
+```
+
+
