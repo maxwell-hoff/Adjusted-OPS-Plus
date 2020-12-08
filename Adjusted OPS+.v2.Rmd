@@ -12,7 +12,7 @@ multi_union_all_1 <- function(mypath){
          datalist = lapply(filenames, function(x){read_csv(file=x, col_names = c("category", "value_1", "value_2", "value_3", "value_4", "value_5", "value_6"))})
          Reduce(function(x,y) {union_all(x,y)}, datalist)}
 
-combined_files_all_years <- multi_union_all_1(“/Users/maxhoff/Documents/Sabremetrics/Adjusted OPS+/retrosheet_data/play_by_play_logs”)
+combined_files_all_years <- multi_union_all_1("/Users/maxhoff/Documents/Sabremetrics/Adjusted OPS+/retrosheet_data/play_by_play_logs")
 ```
-
+asdfa
 
