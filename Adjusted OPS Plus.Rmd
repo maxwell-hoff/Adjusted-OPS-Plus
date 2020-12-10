@@ -163,9 +163,26 @@ bpf_ops <- bpf_ops %>%
 ##part 2
 ##now onto creating summary stats at the player level for the 2019 season
 
-##parameter:
-analysis_year <- 2019
+##home stats df
+plays_all_years %>%
+  group_by(batter_id, `home/away`, bats) %>% 
+  summarize(SLG = (sum(TB, na.rm = TRUE) / sum(AB, na.rm = TRUE)),
+            OBP = ((sum(H, na.rm = TRUE) + sum(BB, na.rm = TRUE) + sum(HBP, na.rm = TRUE))
+                   / (sum(AB, na.rm = TRUE) + sum(BB, na.rm = TRUE) + sum(HBP, na.rm = TRUE) + sum(SF, na.rm = TRUE))
+                   )
+            ) %>%
+  gather(`home/away`, ) %>%
+  unite() %>%
+  spread() %>%
+  rename_all(recode,
+             ) %>%  
+  mutate() %>%
+  select(-,-) %>%
+##redo process before based on these changes
 
-
-
+stats_by_player %>%
+  mutate(SLG_dif = SLG_home - SLG_away,
+         OBP_dif = OBP_home - OBP_away,
+         OPS_dif = (SLG_home + OBP_home) - (SLG_away + OBP_home)) %>%
+  select(-SLG_away, -OBP_away, -SLG_home, -OBP_home)
 ```
