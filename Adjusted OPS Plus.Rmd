@@ -21,9 +21,9 @@ library(ggplot2)
 ##combine all files into one dataframe
 
 multi_union_all <- function(mypath){
-         filenames=list.files(path=mypath, full.names=TRUE)
-         datalist = lapply(filenames, function(x){read_csv(file=x, col_names = c("category", "value_1", "value_2", "value_3", "value_4", "value_5", "value_6"))})
-         Reduce(function(x,y) {union_all(x,y)}, datalist)}
+  filenames=list.files(path=mypath, full.names=TRUE)
+  datalist = lapply(filenames, function(x){read_csv(file=x, col_names = c("category", "value_1", "value_2", "value_3", "value_4", "value_5", "value_6"))})
+  Reduce(function(x,y) {union_all(x,y)}, datalist)}
 
 combined_files_all_years <- multi_union_all("/Users/maxhoff/Downloads/Adjusted-OPS-Plus-main/data/play_by_play")
 ```
@@ -77,6 +77,9 @@ game_info <- combined_files_all_years %>%
   spread(value_1, value_2)
 
 plays_all_years <- merge(plays_all_years, game_info, by = "game_number")
+
+plays_all_years <- plays_all_years %>%
+  mutate(season = str_sub(date, end = 4))
 ```
 
 ```{r}
@@ -88,7 +91,28 @@ plays_all_years$TB <- plays_all_years$`1B` + (plays_all_years$`2B` * 2) + (plays
 ```{r}
 ##load rosters in order to get handedness
 
-rosters_all_years <- distinct(multi_union_all("/Users/maxhoff/Downloads/Adjusted-OPS-Plus-main/data/rosters_all_years"))
+folder_path = "/Users/maxhoff/Downloads/Adjusted-OPS-Plus-main/data/rosters_all_years"
+file_list <- list.files(path = folder_path, full.names = TRUE) 
+
+for (i in file_list){
+  
+  # if the merged dataset doesn't exist, create it
+  if (!exists("rosters_all_years")){
+    rosters_all_years <- read_csv(file = i, col_names = c("category", "value_1", "value_2", "value_3", "value_4", "value_5", "value_6", "season"))
+    rosters_all_years[,"season"] <- str_sub(i, start = (nchar(i) - 7), end = (nchar(i) - 4))
+  }
+  
+  # if the merged dataset does exist, append to it
+  if (exists("rosters_all_years")){
+    temp_dataset <- read_csv(file  = i, col_names = c("category", "value_1", "value_2", "value_3", "value_4", "value_5", "value_6", "season"))
+    temp_dataset["season"] <- str_sub(i, start = (nchar(i) - 7), end = (nchar(i) - 4))
+    rosters_all_years <- rbind(rosters_all_years, temp_dataset)
+    rm(temp_dataset)
+  }
+}
+
+
+rosters_all_years <- distinct(rosters_all_years)
 ```
 
 ```{r}
@@ -105,7 +129,7 @@ rosters_all_years <- rosters_all_years %>%
              value_6 = "position")
 
 plays_all_years <- merge(plays_all_years, 
-                         rosters_all_years[,c("batter_id", "bats")], 
+                         rosters_all_years[,c("batter_id", "bats", "team")], 
                          by = "batter_id", 
                          all.x = TRUE)
 ```
@@ -134,9 +158,7 @@ away_stats <- plays_all_years %>%
                    / (sum(AB, na.rm = TRUE) + sum(BB, na.rm = TRUE) + sum(HBP, na.rm = TRUE) + sum(SF, na.rm = TRUE))
                    )
             )
-```
 
-```{r}
 ##merge home and away dfs
 
 bpf_ops <- full_join(away_stats, 
@@ -153,36 +175,61 @@ rm(home_stats, away_stats)
 ##difference is ball park factor, i.e., how much to increase/decrease stats for each player
 
 bpf_ops <- bpf_ops %>%
-  mutate(SLG_dif = SLG_home - SLG_away,
-         OBP_dif = OBP_home - OBP_away,
-         OPS_dif = (SLG_home + OBP_home) - (SLG_away + OBP_home)) %>%
+  mutate(SLG_adj = SLG_home - SLG_away,
+         OBP_adj = OBP_home - OBP_away,
+         OPS_adj = (SLG_home + OBP_home) - (SLG_away + OBP_home)) %>%
   select(-SLG_away, -OBP_away, -SLG_home, -OBP_home)
 ```
 
 ```{r}
 ##part 2
-##now onto creating summary stats at the player level for the 2019 season
+##create summary stats at the player level for the 2019 season
 
 ##home stats df
-plays_all_years %>%
-  group_by(batter_id, `home/away`, bats) %>% 
-  summarize(SLG = (sum(TB, na.rm = TRUE) / sum(AB, na.rm = TRUE)),
+stats_by_player <- plays_all_years %>%
+  group_by(batter_id, `home/away`, season, team, bats) %>% 
+  summarize(ABs = sum(AB, na.rm = TRUE), 
+            SLG = (sum(TB, na.rm = TRUE) / sum(AB, na.rm = TRUE)),
             OBP = ((sum(H, na.rm = TRUE) + sum(BB, na.rm = TRUE) + sum(HBP, na.rm = TRUE))
                    / (sum(AB, na.rm = TRUE) + sum(BB, na.rm = TRUE) + sum(HBP, na.rm = TRUE) + sum(SF, na.rm = TRUE))
                    )
             ) %>%
-  gather(`home/away`, ) %>%
-  unite() %>%
-  spread() %>%
-  rename_all(recode,
-             ) %>%  
-  mutate() %>%
-  select(-,-) %>%
-##redo process before based on these changes
+  filter(ABs > 0) %>%
+  gather(stat, value, -(batter_id:bats)) %>%
+  mutate(`home/away` = factor(ifelse(`home/away` == 0, "away", "home"))) %>%
+  unite(temp, stat, `home/away`) %>%
+  spread(temp, value) %>%
+  mutate_all(~replace(., is.na(.), 0))
+```
 
-stats_by_player %>%
-  mutate(SLG_dif = SLG_home - SLG_away,
-         OBP_dif = OBP_home - OBP_away,
-         OPS_dif = (SLG_home + OBP_home) - (SLG_away + OBP_home)) %>%
-  select(-SLG_away, -OBP_away, -SLG_home, -OBP_home)
+```{r}
+##merge with bpf
+
+stats_by_player <- left_join(stats_by_player, bpf_ops) %>%
+  mutate(total_ABs = ABs_home + ABs_away,
+         OPS_home = (OBP_home + SLG_home), 
+         OPS_away = (OBP_away + SLG_away),
+         adj_OBP_home = (OBP_home - OBP_adj),
+         adj_SLG_home = (SLG_home - SLG_adj),
+         adj_OPS_home = (OPS_home - OPS_adj),
+         OBP = ((ABs_away / (ABs_away + ABs_home)) * OBP_away) + ((ABs_home / (ABs_away + ABs_home)) * OBP_home),
+         SLG = ((ABs_away / (ABs_away + ABs_home)) * SLG_away) + ((ABs_home / (ABs_away + ABs_home)) * SLG_home),
+         OPS = ((ABs_away / (ABs_away + ABs_home)) * OPS_away) + ((ABs_home / (ABs_away + ABs_home)) * OPS_home),
+         adj_OBP = ((ABs_away / (ABs_away + ABs_home)) * OBP_away) + ((ABs_home / (ABs_away + ABs_home)) * adj_OBP_home),
+         adj_SLG = ((ABs_away / (ABs_away + ABs_home)) * SLG_away) + ((ABs_home / (ABs_away + ABs_home)) * adj_SLG_home),
+         adj_OPS = ((ABs_away / (ABs_away + ABs_home)) * OPS_away) + ((ABs_home / (ABs_away + ABs_home)) * adj_OPS_home),
+         OBP_dif = adj_OBP - OBP,
+         SLG_dif = adj_SLG - SLG,
+         OPS_dif = adj_OPS - OPS
+         ) %>%
+  select(total_ABs, OBP, SLG, OPS, adj_OBP, adj_SLG, adj_OPS, OBP_dif, SLG_dif, OPS_dif)
+```
+
+```{r}
+
+stats_by_player %>% 
+  filter(total_ABs > 600,
+         season == '2019') %>%
+  arrange(desc(OPS))
+
 ```
