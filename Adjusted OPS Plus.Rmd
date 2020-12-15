@@ -7,6 +7,8 @@ date: "12/07/2020"
 ```{r}
 #load packages
 
+options("scipen"=100, "digits"=4)
+
 library(readr)
 library(stringr)
 library(tidyr)
@@ -76,7 +78,7 @@ game_info <- combined_files_all_years %>%
   select(value_1, value_2, game_number) %>%
   spread(value_1, value_2)
 
-plays_all_years <- merge(plays_all_years, game_info, by = "game_number")
+plays_all_years <- merge(plays_all_years, game_info, by = "game_number",)
 
 plays_all_years <- plays_all_years %>%
   mutate(season = str_sub(date, end = 4))
@@ -129,8 +131,8 @@ rosters_all_years <- rosters_all_years %>%
              value_6 = "position")
 
 plays_all_years <- merge(plays_all_years, 
-                         rosters_all_years[,c("batter_id", "bats", "team")], 
-                         by = "batter_id", 
+                         rosters_all_years[,c("batter_id", "last_name", "first_name", "bats", "team", "season")], 
+                         by = c("batter_id", "season"), 
                          all.x = TRUE)
 ```
 
@@ -187,7 +189,7 @@ bpf_ops <- bpf_ops %>%
 
 ##home stats df
 stats_by_player <- plays_all_years %>%
-  group_by(batter_id, `home/away`, season, team, bats) %>% 
+  group_by(batter_id, last_name, first_name, `home/away`, season, team, bats) %>% 
   summarize(ABs = sum(AB, na.rm = TRUE), 
             SLG = (sum(TB, na.rm = TRUE) / sum(AB, na.rm = TRUE)),
             OBP = ((sum(H, na.rm = TRUE) + sum(BB, na.rm = TRUE) + sum(HBP, na.rm = TRUE))
@@ -222,14 +224,17 @@ stats_by_player <- left_join(stats_by_player, bpf_ops) %>%
          SLG_dif = adj_SLG - SLG,
          OPS_dif = adj_OPS - OPS
          ) %>%
-  select(total_ABs, OBP, SLG, OPS, adj_OBP, adj_SLG, adj_OPS, OBP_dif, SLG_dif, OPS_dif)
+  select(total_ABs, OBP, SLG, OPS, adj_OBP, adj_SLG, adj_OPS, OBP_dif, SLG_dif, OPS_dif) %>%
+  dplyr::mutate(OPS_rank = dense_rank(desc(OPS)),
+         adj_OPS_rank = dense_rank(desc(adj_OPS)),
+         .before = "total_ABs")
 ```
 
 ```{r}
+##EDA
 
 stats_by_player %>% 
-  filter(total_ABs > 600,
+  filter(total_ABs > 500,
          season == '2019') %>%
   arrange(desc(OPS))
-
 ```
